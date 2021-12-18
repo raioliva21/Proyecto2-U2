@@ -3,7 +3,8 @@
 #importan librerias
 import os
 import gi
-import pandas
+import pandas as pd
+import numpy as np
 # Selecciona que la versión de GTK a trabajar (3.0)
 gi.require_version("Gtk", "3.0")
 # Importa writer class desde csv module
@@ -14,6 +15,17 @@ from os.path import isfile, join
 from program_filechooser import DlgFileChooser
 from messages import on_error_clicked, on_warn_clicked, on_info_clicked
 
+
+def open_file(nombre_archivo = None):
+
+    try:
+        with open(nombre_archivo) as archivo:
+            print("se abre archivo")
+            datos_archivo = archivo.readlines()
+            return datos_archivo
+    except FileNotFoundError:
+        print("Error, el archivo no fue encontrado")
+        quit()
 
 def listar(ruta):
 
@@ -45,8 +57,13 @@ class Ventana():
 
         self.tree = builder.get_object("tree")
         self.review = builder.get_object("review")
-        self.boton_about = builder.get_object("boton_about")
-        self.boton_about.connect("clicked", self.click_boton_about)
+
+        boton_resumen = builder.get_object("resumen_data")
+        boton_resumen.connect("clicked", self.btn_resumen_clicked)
+
+        boton_about = builder.get_object("boton_about")
+        boton_about.connect("clicked", self.click_boton_about)
+
         self.boton_edit = builder.get_object("boton_editar")
         self.boton_edit.connect("clicked", self.edit_select_data)
         
@@ -137,7 +154,7 @@ class Ventana():
     def create_tree(self, path_file):
 
         try:
-            data = pandas.read_csv(path_file)
+            data = pd.read_csv(path_file)
         except NameError:
             texto_principal = "Error en el programa"
             texto_secundario = "Archivo seleccionado no ha sido encontrado."
@@ -167,7 +184,7 @@ class Ventana():
             modelo.append(line)
         
 
-    def click_boton_about(self, cmb=None):
+    def click_boton_about(self, btn=None):
         about = Gtk.AboutDialog()
         about.set_modal(True)
         about.set_title("Drug review")
@@ -180,17 +197,26 @@ class Ventana():
         about.run()
         about.destroy()
     
-    def edit_select_data(self, cm=None):
+    def btn_resumen_clicked(self, btn=None):
+        if self.project_data_folder != True:
+            on_info_clicked(self.window, self.principal_info, self.secundaria_info)
+        else:
+            #ventana_resumen = Ventana_Resumen()
+            pass
+        
+    
+    def edit_select_data(self, cmb=None):
 
         if self.project_data_folder != True:
             self.principal_info = "Operacion no habilitada"
             self.secundaria_info = "Lo siento, la operacion no esta habilitada para este archivo."
             on_info_clicked(self.window, self.principal_info, self.secundaria_info)
+            return
 
         """Edita datos seleccionados."""
         model, it = self.tree.get_selection().get_selected()
         # Validación no selección
-        if model is None or it is None or self.project_data_folder != True:
+        if model is None or it is None:
             return
 
         ventana_dialogo = Ventana_Dialogo()
@@ -255,11 +281,12 @@ class Ventana():
                             texto_secundario)
             else:
 
-                archivocsv = f'{self.ruta}/data_{year}.csv'
-                print("el archivo csv es ", archivocsv)
+                self.archivocsv = f'{self.ruta}/data_{year}.csv'
+                print("el archivo csv es ", self.archivocsv)
                 ID_selected = int(ID_selected)
-                data = pandas.read_csv(archivocsv, index_col ="uniqueID" )
+                data = pd.read_csv(self.archivocsv, index_col ="uniqueID" )
                 data.drop(ID_selected, inplace = True)
+                data.to_csv(self.archivocsv)
 
                 List = [ID_selected, drug_name, condition, new_comment, new_rating, new_date]
 
@@ -267,7 +294,7 @@ class Ventana():
 
                     # Abre archivo csv existente como 'archivo'
                     # archivo es abierto en modo 'a'
-                    with open(archivocsv, 'a') as archivo:
+                    with open(self.archivocsv, 'a') as archivo:
                         # pasa archivo a csv.writer()
                         # y se obtiene writer object
                         writer_object = writer(archivo)
@@ -304,7 +331,6 @@ class Ventana_Dialogo():
         self.drug_name.set_label("Drug name: ")
         self.drug_name_entry = builder.get_object("drug_name_entry")
 
-
         self.condition = builder.get_object("condition")
         self.condition.set_label("Condition: ")
         self.condition_entry = builder.get_object("condition_entry")
@@ -324,6 +350,55 @@ class Ventana_Dialogo():
 
 
         self.dialogo.show_all()
+
+class Ventana_Resumen():
+
+    def __init__(self):
+
+        """
+        #error: muestra ventana principal
+        ventana = Ventana()
+
+        print("ventana obtener resumen")
+        # Creamos un objecto que hara la instrospection
+        builder = Gtk.Builder()
+        # Llamamos al archivo creado
+        builder.add_from_file("/home/raimundoosf/Escritorio/laboratorio1U2.glade")
+        # Asociamos a atributos cada uno de los elementos del glade (ID)
+        self.ventana_resumen = builder.get_object("ventana_resumen_data")
+        self.ventana_resumen.set_title("Resumen de data")
+        data = open_file(ventana.archivocsv)
+        print(data)
+        datos = data[1:len(data)]
+
+        almacen = []
+        for item in datos:
+            item = item.strip().split(",")
+            almacen.append(item)
+
+        NaN = np.nan
+        dataframe = pd.DataFrame(almacen)
+        dataframe = pd.DataFrame(almacen, columns = ["uniqueID", "drugName", "review",
+                                                    "rating", "date", "usefulCount"])
+
+        print(dataframe)
+        # obtiene edad promedio 
+        promedio_rating = int(np.asarray(dataframe['rating'], dtype=np.int).mean())
+        # Imprimimos la media de la columna 'rating'
+        print("el pormedio de rating es: ", promedio_rating)
+
+        # medicamento de mayor consumo"
+        print("la droga de mayor consumo es")
+        droga_mayor_consumo = dataframe['drugname'].value_counts().idxmax()
+        print(droga_mayor_consumo)
+        
+        print("la fila con maxima puntuacion es la sig")
+        print(dataframe[dataframe.usefulCount == dataframe.usefulCount.max()])
+
+        self.ventana_resumen.show_all()
+        Ventana.hide()
+
+        """
 
 if __name__ == "__main__":
     Ventana()
