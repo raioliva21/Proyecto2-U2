@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 import pandas as pd
 import csv
 
@@ -8,14 +9,16 @@ archivocsv = "/home/raimundoosf/Escritorio/Proyecto2U2/drugsComTest_raw.csv"
 def convert_to_csv(data_name, data):
 
     # se definen las columnas del archvio csv
-    columns = ["uniqueID", "drugName", "condition", "review", "date", "usefulCount"]
+    columns = ["uniqueID", "drugName", "condition", "review", "rating", "date", "usefulCount"]
     
     # crea lista
     rows = []
     # se agregan lineas/filas a lista
     for index in range(0, len(data)):
-        rows.append([data[index]["uniqueID"], data[index]["drugName"], data[index]["condition"],
-                    data[index]["review"], data[index]["date"], data[index]["usefulCount"]])
+        rows.append([data[index]["uniqueID"], data[index]["drugName"],
+                     data[index]["condition"], data[index]["review"],
+                     data[index]["rating"], data[index]["date"], 
+                     data[index]["usefulCount"]])
 
     # se abre/crea archivo csv    
     with open(f'{data_name}.csv', 'w') as f:
