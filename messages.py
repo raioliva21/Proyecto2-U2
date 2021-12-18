@@ -1,16 +1,16 @@
 from gi.repository import Gtk
 
 
-def on_info_clicked(widget):
+def on_info_clicked(widget, principal, secundaria):
     dialog = Gtk.MessageDialog(
         transient_for=widget,
         flags=0,
         message_type=Gtk.MessageType.INFO,
         buttons=Gtk.ButtonsType.OK,
-        text="This is an INFO MessageDialog",
+        text= principal,
     )
     dialog.format_secondary_text(
-        "And this is the secondary text that explains things."
+        secundaria
     )
     dialog.run()
     print("INFO dialog closed")
@@ -23,16 +23,18 @@ def on_error_clicked(widget, principal, secundaria):
         transient_for=widget,
         flags=0,
         message_type=Gtk.MessageType.ERROR,
-        buttons=Gtk.ButtonsType.CANCEL,
+        buttons=Gtk.ButtonsType.OK,
         text=principal
     )
     dialog.format_secondary_text(
         secundaria
     )
-    dialog.run()
-    print("ERROR dialog closed")
-
-    dialog.destroy()
+    response = dialog.run()
+    
+    if response == Gtk.ResponseType.OK:
+        print("WARN dialog closed by clicking OK button")
+        print("ERROR dialog closed")
+        dialog.destroy()
     
 
 def on_warn_clicked(widget, principal, secundaria):
@@ -70,3 +72,4 @@ def on_question_clicked(widget):
         print("QUESTION dialog closed by clicking NO button")
 
     dialog.destroy()
+
