@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #importan librerias
-import json
+import os
 import gi
 import pandas
 # Selecciona que la versión de GTK a trabajar (3.0)
@@ -10,45 +10,37 @@ gi.require_version("Gtk", "3.0")
 from csv import writer
 # Importa Gtk
 from gi.repository import Gtk
+from os.path import isfile, join
 from program_filechooser import DlgFileChooser
-from messages import on_error_clicked, on_warn_clicked
+from messages import on_error_clicked, on_warn_clicked, on_info_clicked
 
-"""abre archivo json"""
-def open_file(file):
-    try:
-        with open(file, 'r') as archivo:
-            data = json.load(archivo)
-    except IOError:
-        print("archivo no encontrado")
-        data = []
-    return data
+
+def listar(ruta):
+
+    contenido = os.listdir(ruta)
+    archivos = [nombre for nombre in contenido if isfile(join(ruta, nombre))]
+
+    return archivos
 
 
 """ventana principal"""
 class Ventana():
 
-    def __init__(self):
 
+    def __init__(self):
+        
         builder = Gtk.Builder()
         builder.add_from_file("proyecto.ui")
         self.window = builder.get_object("ventana")
         self.window.connect("destroy", Gtk.main_quit)
         self.window.resize(600, 400)
 
+        # boton abrir archivos
         boton_abrir = builder.get_object("boton_abrir")
         boton_abrir.connect("clicked", self.open_btn_clicked, "open_mode")
 
-        years = open_file("years.json")
-
-        lista = ["Seleccione un año"] + years[0]['year']
-
         # comboboxtext
         self.comboboxtext = builder.get_object("comboboxtext")
-        for item in lista:
-            self.comboboxtext.append_text(item)
-
-        self.comboboxtext.set_active(0)
-
         self.comboboxtext.connect("changed", self.comboboxtext_change)
 
         self.tree = builder.get_object("tree")
@@ -61,34 +53,68 @@ class Ventana():
         self.window.show_all()
         self.review.hide()
     
+    """se presiona en boton abrir archivo"""
     def open_btn_clicked(self, btn=None, mode=None):
 
+        """se abre filechooser"""
         dialogo = DlgFileChooser(mode)
         filechooser = dialogo.filechooser
 
+        """se agrega filtro y modifica nombre"""
         filter_csv = Gtk.FileFilter()
         filter_csv.add_mime_type("text/csv")
+        #filter_csv.add_mime_type("folder")
         filter_csv.set_name("Archivos CSV")
+        #filter_csv.add_pattern("*")
         filechooser.add_filter(filter_csv)
 
+        """se asigna respuesta"""
         response = filechooser.run()
 
-        if response == Gtk.ResponseType.OK:
-            print("Presionó el boton OK")
-            self.create_tree(filechooser.get_filename())
 
-        # if response == Gtk.ResponseType.CANCEL:
+        if response == Gtk.ResponseType.OK:
+            print("Presionó el boton ABRIR")
+            self.project_data_folder = None
+            self.ruta = filechooser.get_current_folder()
+            if self.ruta != None:
+                aux = self.ruta
+                aux = aux.split("/")
+                if aux[-1] == "data_folder":
+                    self.project_data_folder = True
+
+            """si archivo esta almacenado en carpeta asociada a proyecto"""
+            if self.project_data_folder == True:
+                archivos = listar(self.ruta)
+                self.comboboxtext.append_text("Seleccione un año")
+                for item in archivos:
+                    item = item[5:-4]
+                    self.comboboxtext.append_text(item)
+                self.comboboxtext.set_active(0)
+            else:
+                self.comboboxtext.remove_all()
+                self.review.set_label("")
+
+            #print(type(filechooser.get_filename()))
+            checking_file = filechooser.get_filename()[-4:]
+            if checking_file == ".csv":
+                self.create_tree(filechooser.get_filename())
+            else:
+                principal = "Error al intentar abrir."
+                secundaria = "Unicamente se permite abrir archivos."
+                on_error_clicked(self.window, principal, secundaria)
+
         filechooser.destroy()
 
+    """eventos dependientes de seleccion en combobox"""
     def comboboxtext_change(self, cmb=None):
 
         year = self.comboboxtext.get_active_text()
 
-        if self.comboboxtext.get_active() != 0:
-            path_file = f'data_{year}.csv'
+        if self.comboboxtext.get_active() != 0 and self.project_data_folder == True:
+            path_file = f'{self.ruta}/data_{year}.csv'
             self.create_tree(path_file)
         
-        self.tree.connect("row-activated", self.click_column)
+            self.tree.connect("row-activated", self.click_column)
 
         #self.review.show()
 
@@ -147,7 +173,7 @@ class Ventana():
         about.set_title("Drug review")
         about.set_program_name("Proyecto Programación 1")
         about.set_name("Example")
-        about.set_authors(["Fabio Durán-Verdugo / Raimundo Oliva San Felú"])
+        about.set_authors(["Raimundo Oliva San Felú"])
         about.set_comments("The program's purpose is to display/edit data that provides patient reviews of specific medications")
         about.set_logo_icon_name("go-home")
 
@@ -156,10 +182,15 @@ class Ventana():
     
     def edit_select_data(self, cm=None):
 
+        if self.project_data_folder != True:
+            self.principal_info = "Operacion no habilitada"
+            self.secundaria_info = "Lo siento, la operacion no esta habilitada para este archivo."
+            on_info_clicked(self.window, self.principal_info, self.secundaria_info)
+
         """Edita datos seleccionados."""
         model, it = self.tree.get_selection().get_selected()
         # Validación no selección
-        if model is None or it is None:
+        if model is None or it is None or self.project_data_folder != True:
             return
 
         ventana_dialogo = Ventana_Dialogo()
@@ -167,7 +198,10 @@ class Ventana():
         ventana_dialogo.ID_entry.set_label(model.get_value(it, 0))
         ventana_dialogo.drug_name_entry.set_label(model.get_value(it, 1))
         ventana_dialogo.condition_entry.set_label(model.get_value(it, 2))
+        ventana_dialogo.rating_entry.set_text(model.get_value(it,4))
 
+        buffer_review = ventana_dialogo.comment_entry.get_buffer()
+        buffer_review.set_text(model.get_value(it,3))
 
         fecha = model.get_value(it,5)
         fecha = fecha.split("-")
@@ -179,8 +213,6 @@ class Ventana():
 
         ventana_dialogo.calendar.select_day(day)
         ventana_dialogo.calendar.select_month(int(month[fecha[1]]),int(year))
-
-        buffer_review = ventana_dialogo.comment_entry.get_buffer()
         
         response = ventana_dialogo.dialogo.run()
 
@@ -222,7 +254,8 @@ class Ventana():
                             texto_principal,
                             texto_secundario)
             else:
-                archivocsv = f"data_{year}.csv"
+
+                archivocsv = f'{self.ruta}/data_{year}.csv'
                 print("el archivo csv es ", archivocsv)
                 ID_selected = int(ID_selected)
                 data = pandas.read_csv(archivocsv, index_col ="uniqueID" )
